@@ -1,0 +1,260 @@
+---
+title:  607_Project-3-DS-Skills-Daniel Thonn
+output: html_document
+course: R-607 CUNY MSDA program
+reference-1: "http//www.cs.ukzn.ac.za/~hughm/dm/content/slides06.pdf"
+reference-2: "http//www.rdatamining.com/examples/decision-tree"
+
+
+---
+
+# Assignment: 607_Project-3-DS-Skills-Daniel Thonn
+
+Summary of Assignment
+This project involes downloading Data Science skills from the internet then processing and presenting the data
+
+This Assignment requires the following:
+
+1). R-Studio
+
+The following R-packages are used:
+1.rpart
+2.party
+3.randomForest 
+
+Steps to reproduce:
+1). run the R-Studio file: R_607_Project_3a_DS_Skils_Daniel_Thonn.Rmd
+
+
+Setting up and Preparing the Environment
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=TRUE}
+
+#packages and libraries
+
+#library for building basic decision tree
+library(rpart)
+
+#library for ctree decision tree
+#install.packages("party")
+library(party)
+
+#library for randomForest decision tree
+#install.packages("randomForest")
+library(randomForest)
+
+#install.packages("dbConnect")
+library(dbConnect) 
+
+#install.packages("gplot2")
+library(ggplot2)
+
+#install.packages("tidyr")
+library(tidyr)
+library(dplyr)
+library(knitr)
+
+
+```
+
+# Retreive data from database
+
+```{r, echo=TRUE}
+
+username = 'data607' 
+password = 'project3' 
+dbname = 'ds_skills' 
+host = 'data607-project3.ce2dfe0qxt5q.us-west-2.rds.amazonaws.com' 
+myDb = dbConnect(MySQL(), user=username, password=password, dbname=dbname, host=host) 
+ 
+ 
+qryString = 'SELECT jobs.post_id, role_desc, city, state, keyword_desc  
+             FROM jobs 
+             INNER JOIN locations 
+             ON jobs.loc_id = locations.loc_id 
+             INNER JOIN roles 
+             ON jobs.role_id = roles.role_id 
+             INNER JOIN post_keys 
+             ON jobs.post_id = post_keys.post_id  
+             INNER JOIN  keywords 
+             ON post_keys.key_id = keywords.key_id 
+             ;' 
+ 
+ 
+selectQry = dbSendQuery(myDb, qryString) 
+results = fetch(selectQry, n = -1) 
+
+#results
+head(results)
+#str(results)
+
+```
+
+```{r, echo=TRUE}
+# Test Plots
+#ggplot(data=results, aes(x=role_desc, y=keyword_desc, group=role_desc)) + geom_line()
+
+#ggplot(data=results, aes(x=role_desc, y=city),group=role_desc) + geom_line()
+
+#ggplot(data=results, aes(x=role_desc, y=keyword_desc)) + geom_line()
+
+#ggplot() + geom_line(results, aes(x="role_desc", y="keyword_desc", group="role_desc"))
+
+#ggplot() + geom_line(results, aes(x="role_desc", y="keyword_desc"))
+
+```
+
+```{r, echo=TRUE}
+results1 <- select(results, role_desc, keyword_desc)
+
+library(plyr)
+
+results2 <- count(results1, c("role_desc", "keyword_desc")) 
+#results2
+
+#library(tidyr) 
+
+results3 <- spread(results2, keyword_desc, freq) 
+#results3
+
+results3[is.na(results3)] <- 0 
+#results3
+
+names(results3) <- sub(" ", "", names(results3))
+names(results3) <- sub(" ", "", names(results3))
+results3$role_desc<-as.factor(results3$role_desc)
+
+```
+
+
+
+
+```{r, echo=TRUE}
+## This section needs to be adjusted
+
+#This section creates a table of non-distinct role_desc vs keyword_desc 
+
+role_vs_Keyword_a <- results %>%
+  select(role_desc,keyword_desc) 
+
+
+#list(role_vs_Keyword_a)
+head(role_vs_Keyword_a)
+#role_vs_Keyword_a
+
+#str(role_vs_Keyword_a)
+
+role_vs_Keyword_b <- role_vs_Keyword_a
+#role_vs_Keyword_b
+role_vs_Keyword_b2 <- role_vs_Keyword_b
+head(role_vs_Keyword_b2)
+role_vs_Keyword_b2$row <- rep(1,nrow(role_vs_Keyword_b2))
+role_vs_Keyword_b2$row2 <- 1:nrow(role_vs_Keyword_b2)
+#role_vs_Keyword_b2
+
+# Spread keyword values to columns
+wide <- spread(role_vs_Keyword_b2,keyword_desc,row)
+
+head(wide)
+
+#wide
+
+#str(wide)
+
+wide_2 <- wide
+
+#cleanup data frame:
+wide_2[is.na(wide_2)] <- 0
+
+#head(wide_2)
+
+#wide_2
+head(wide_2)
+#str(wide_2)
+#names(wide_2)
+#wide_2
+
+# Cleanup dataframe
+wide_2$role_desc<-as.factor(wide_2$role_desc)
+names(wide_2) <- sub(" ", "", names(wide_2))
+names(wide_2) <- sub(" ", "", names(wide_2))
+
+#names(wide_2)
+#head(wide_2)
+wide_3 <- subset(wide_2,select= -c(row2))
+head(wide_3)
+
+
+#Create and plot ctree of dataframe
+target2 <- role_desc ~ .
+cdt2 <- ctree(target2,wide_3)
+#cdt2
+plot(cdt2,type="simple")
+
+#names(wide_2)
+head(wide_2)
+#str(wide_2)
+#wide_2
+
+#Create and plot ctree of dataframe
+#skill_ctree <- ctree(role_desc ~ r + cassandra + d3, data=wide_2)
+skill_ctree <- ctree(role_desc ~ excel + hadoop + sql, data=wide_3)
+plot(skill_ctree)
+
+skill_ctree2 <- ctree(role_desc ~ sql + java + python + scala + hive, data=wide_3)
+#summary(iris$Species)
+plot(skill_ctree2)
+
+# Predict by Random Forest Method
+#wide_3
+names(wide_3)
+#wide_2$role_desc
+#wide_2$hadoop
+
+# Create a predictive model of the data - rf
+rf <- randomForest(target2,data=wide_3,ntree=1000,proximity=TRUE)
+#table(predict(rf),wide_2$role_desc)
+
+#names(wide_3)
+newdata <- data.frame(r=1,
+                      cassandra = 0,
+                      d3 = 0,
+                      d3.js=0,
+                      excel=1,
+                      flume = 0,
+                      hadoop=1,
+                      hbase = 0,
+                      hive = 0,
+                      java = 1,
+                      mahout = 0,
+                      mapreduce = 0,
+                      matlab = 0,
+                      mongodb = 0,
+                      nosql = 1,
+                      oozie = 0,
+                      pig = 0,
+                      python = 1,
+                      ruby = 0,
+                      sas = 1,
+                      scala = 0,
+                      shark = 0,
+                      spark = 1,
+                      spss = 0,
+                      sql = 1,
+                      tableau = 0
+                    )
+
+
+p <- predict(rf,newdata)
+
+p
+
+```
+
+
+
+#END
