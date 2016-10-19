@@ -1,0 +1,53 @@
+---
+title: "role_vs_keyword"
+author: "Ahsanul Choudhury"
+date: "October 18, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+library(dbConnect)
+library(RMySQL)
+
+username = 'data607'
+password = 'project3'
+dbname = 'ds_skills'
+host = 'data607-project3.ce2dfe0qxt5q.us-west-2.rds.amazonaws.com'
+myDb = dbConnect(MySQL(), user=username, password=password, dbname=dbname, host=host)
+
+qryString = 'SELECT jobs.post_id, role_desc, city, state, keyword_desc 
+FROM jobs
+INNER JOIN locations
+ON jobs.loc_id = locations.loc_id
+INNER JOIN roles
+ON jobs.role_id = roles.role_id
+INNER JOIN post_keys
+ON jobs.post_id = post_keys.post_id 
+INNER JOIN  keywords
+ON post_keys.key_id = keywords.key_id
+;'
+
+selectQry = dbSendQuery(myDb, qryString)
+results = fetch(selectQry, n = -1)
+results
+
+library(dplyr)
+names(results)
+
+results1 <- select(results, role_desc, keyword_desc)
+
+library(plyr)
+
+results2 <- count(results1, c("role_desc", "keyword_desc"))
+results2
+
+library(tidyr)
+results3 <- spread(results2, keyword_desc, freq)
+results3
+
+
+results3[is.na(results3)] <- 0
+results3
